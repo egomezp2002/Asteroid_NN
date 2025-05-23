@@ -46,9 +46,9 @@ def propagate_asteroid_backward(end_year, filename, v_range_kmps=(15, 45)):
         y = data[:, 2 + i*3]
         z = data[:, 3 + i*3]
         interpolators[name] = {
-            'x': interp1d(times, x, kind='cubic'),
-            'y': interp1d(times, y, kind='cubic'),
-            'z': interp1d(times, z, kind='cubic')
+            'x': interp1d(times, x, kind='linear'),
+            'y': interp1d(times, y, kind='linear'),
+            'z': interp1d(times, z, kind='linear')
         }
 
     # Posición de la Tierra en el momento del impacto (última fila)
@@ -110,9 +110,9 @@ def propagate_asteroid_backward(end_year, filename, v_range_kmps=(15, 45)):
         state0,
         method='RK45',
         t_eval=t_eval,
-        rtol=1e-9  # alta precisión relativa
+        rtol=1e-5 
     )
 
     # Devolver estado del asteroide en la fecha actual (t=0)
     current_state = sol.y[:, -1]
-    return current_state, sol
+    return current_state, sol, v_xyz

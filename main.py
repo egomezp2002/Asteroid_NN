@@ -10,7 +10,7 @@ planet_names = ["Sun", "Mercury", "Venus", "Earth", "Mars",
                 "Jupiter", "Saturn", "Uranus", "Neptune"]
 
 # Año final y año actual
-end_year = 2040
+end_year = 2026
 start_year = datetime.now().year
 
 # Ejecutar simulación
@@ -93,7 +93,7 @@ from backwards_propagator import propagate_asteroid_backward
 filename = f"planet_positions_hourly_until_{end_year}.npy"
 
 # Cargar la trayectoria del asteroide
-current_state, sol = propagate_asteroid_backward(end_year, filename)
+current_state, sol, launch_velocity = propagate_asteroid_backward(end_year, filename)
 asteroid_xy = sol.y[0:2].T  # posiciones x, y en cada tiempo
 
 # Dibujar trayectoria
@@ -105,7 +105,27 @@ plt.plot(asteroid_xy[-1, 0], asteroid_xy[-1, 1], 'bo', label="Estado actual")
 plt.xlabel("X (UA)")
 plt.ylabel("Y (UA)")
 plt.title("Trayectoria del asteroide propagada hacia atrás")
-plt.axis("equal")
+plt.axis('equal')
+plt.xlim(-35, 35)
+plt.ylim(-35, 35)
 plt.legend()
 plt.grid(True)
+
+# Añadir círculos para representar órbitas planetarias típicas
+orbital_radii = [0.39, 0.72, 1.00, 1.52, 5.20, 9.58, 19.2, 30.1]
+for r in orbital_radii:
+    circle = plt.Circle((0, 0), r, color='gray', linestyle='--', linewidth=0.5, fill=False)
+    plt.gca().add_patch(circle)
+
+# Dibujar vector de velocidad en el punto de impacto
+impact_x, impact_y = asteroid_xy[0]  # posición de impacto (primer punto)
+vx, vy = launch_velocity[:2]         # componentes x, y de la velocidad
+
+scale = 5  # ajusta para que la flecha se vea clara
+plt.quiver(
+    impact_x, impact_y, vx, vy,
+    angles='xy', scale_units='xy', scale=1/scale,
+    color='green', label='Vector de lanzamiento'
+)
+
 plt.show()
