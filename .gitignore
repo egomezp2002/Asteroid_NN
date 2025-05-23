@@ -1,0 +1,51 @@
+# Archivos Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Entornos virtuales
+env/
+venv/
+ENV/
+.venv/
+
+# Archivos de configuración sensibles
+*.env
+*.ini
+*.cfg
+*.ip
+config.json
+config.yaml
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# Archivos temporales
+*.tmp
+*.bak
+*.swp
+
+# Ignorar archivos potencialmente muy pesados
+*.npy
+*.csv
+*.mp4
+*.avi
+*.mov
+*.gif
+*.zip
+*.tar.gz
+*.h5
+*.pkl
+
