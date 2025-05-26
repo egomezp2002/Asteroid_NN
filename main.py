@@ -73,6 +73,8 @@ points = [ax.plot([], [], 'o', color=colors[i], label=planet_names[i])[0] for i 
 
 ax.set_xlim(-35, 35)
 ax.set_ylim(-35, 35)
+ax.set_xlabel("Distance (AU)")        # Unidad en eje X
+ax.set_ylabel("Distance (AU)")       # Unidad en eje Y
 ax.set_aspect('equal')
 ax.legend(loc='upper right')
 year_text = ax.text(0.5, 1.02, '', transform=ax.transAxes,
@@ -86,7 +88,7 @@ def update(frame):
         points[i].set_data([positions[frame-1, i, 0]], [positions[frame-1, i, 1]])
     current_fraction = frame / n_steps
     current_year = end_year - current_fraction * years_back
-    year_text.set_text(f"Año: {current_year:.1f}")
+    year_text.set_text(f"Year: {current_year:.1f}")
     return lines + points + [year_text]
 
 ani = FuncAnimation(fig, update, frames=range(10, n_steps, 10), interval=30, blit=False)
@@ -117,12 +119,15 @@ def run_simulation(integrator_name):
             m=0.0)
 
     sim.integrator = integrator_name
-    if integrator_name != "ias15":
-        sim.dt = dt
+    if integrator_name == "ias15":
+        sim.dt = 1e-1
 
     energies, times = [], []
     for _ in range(n_steps):
         sim.integrate(sim.t + dt)
+
+        if _ % 1 == 0:
+            print(f"IAS15 paso {_}/{n_steps}  tiempo = {sim.t}")
 
         # Cálculo manual de la energía total
         E_kin = sum(0.5 * p.m * (p.vx**2 + p.vy**2 + p.vz**2) for p in sim.particles if p.m > 0)
@@ -141,22 +146,24 @@ def run_simulation(integrator_name):
 
 times_whfast, energies_whfast = run_simulation("whfast")
 times_ias15, energies_ias15 = run_simulation("ias15")
+times_saba4, energies_saba4 = run_simulation("saba4")
 
 plt.figure(figsize=(10, 5))
 plt.plot(times_whfast, energies_whfast - energies_whfast[0], label="WHFast", alpha=0.8)
 plt.plot(times_ias15, energies_ias15 - energies_ias15[0], label="IAS15", alpha=0.8)
-plt.xlabel("Tiempo (años)")
-plt.ylabel("Δ Energía (E - E₀)")
-plt.title("Comparación de variación de energía: WHFast vs IAS15 (integración hacia atrás)")
+plt.plot(times_saba4, energies_saba4 - energies_saba4[0], label="SABA4", alpha=0.8)
+plt.xlabel("Time (years)")
+plt.ylabel("Δ Energy (E - E₀)")
+plt.title("Variation of energy throughout simulation: Different integration methods")
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
 plt.show()
 
-
+"""
 results = []
 
-for i in range(GAMMA):
+for i in range(Gamma):
     # Copiamos la parte esencial de run_simulation para obtener 'sim'
     sim = rebound.Simulation()
     sim.units = ('AU', 'yr', 'Msun')
@@ -201,3 +208,4 @@ for i in range(GAMMA):
 df = pd.DataFrame(results)
 df.to_csv("whfast_asteroid_dataset.csv", index=False)
 print("✅ Dataset guardado como 'whfast_asteroid_dataset.csv'")
+"""
