@@ -3,14 +3,15 @@ from datetime import datetime
 from solar_simulation import simulate_solar_system_hourly
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-
+import random
+import rebound
 
 # Nombres reales de los cuerpos (en el mismo orden que en la simulación)
 planet_names = ["Sun", "Mercury", "Venus", "Earth", "Mars",
                 "Jupiter", "Saturn", "Uranus", "Neptune"]
 
 # Año final y año actual
-end_year = 2026
+end_year = 2028
 start_year = datetime.now().year
 
 # Ejecutar simulación
@@ -82,50 +83,89 @@ def update(frame):
 ani = FuncAnimation(fig, update, frames=range(100, len(data), 100), interval=1, blit=True)
 plt.show()
 """
+####################################
+# Propagación hacia atrás del asteroide con Rebound
 
+start_year = datetime.now().year
+years_back = end_year - start_year
 
-# -----------------------------------------------------------------------------------
-# Backwards propagation del asteroide que impacta
-# -----------------------------------------------------------------------------------
+# Inicializar simulación
+sim = rebound.Simulation()
+sim.units = ('AU', 'yr', 'Msun')
+sim.add(["Sun", "Mercury", "Venus", "Earth", "Mars",
+         "Jupiter", "Saturn", "Uranus", "Neptune"], date=f"{end_year}-01-01")
 
-from backwards_propagator import propagate_asteroid_backward
+# Obtener la Tierra (asumiendo que es el cuarto planeta tras el Sol)
+earth = sim.particles[3]
 
-filename = f"planet_positions_hourly_until_{end_year}.npy"
+# Generar velocidad de impacto aleatoria (15–45 km/s) convertida a AU/año
+v_kms = random.uniform(15, 45)
+v_auyr = v_kms / 4.74047
 
-# Cargar la trayectoria del asteroide
-current_state, sol, launch_velocity = propagate_asteroid_backward(end_year, filename)
-asteroid_xy = sol.y[0:2].T  # posiciones x, y en cada tiempo
+# Dirección aleatoria en el plano XY
+angle = random.uniform(0, 2*np.pi)
+vx = -v_auyr * np.cos(angle)
+vy = -v_auyr * np.sin(angle)
 
-# Dibujar trayectoria
-plt.figure(figsize=(8, 8))
-plt.plot(asteroid_xy[:, 0], asteroid_xy[:, 1], 'r-', label="Asteroide")
-plt.plot(asteroid_xy[0, 0], asteroid_xy[0, 1], 'go', label="Inicio (impacto)")
-plt.plot(asteroid_xy[-1, 0], asteroid_xy[-1, 1], 'bo', label="Estado actual")
+# Añadir satélite en posición de la Tierra con velocidad relativa
+sim.add(x=earth.x, y=earth.y, z=earth.z,
+        vx=earth.vx + vx, vy=earth.vy + vy, vz=earth.vz,
+        m=0.0)
 
-plt.xlabel("X (UA)")
-plt.ylabel("Y (UA)")
-plt.title("Trayectoria del asteroide propagada hacia atrás")
-plt.axis('equal')
-plt.xlim(-35, 35)
-plt.ylim(-35, 35)
-plt.legend()
-plt.grid(True)
+# Configuración del integrador y propagación hacia atrás
+sim.integrator = "whfast"
+n_steps = 10000
+dt = -years_back / n_steps  # paso negativo para ir hacia atrás
 
-# Añadir círculos para representar órbitas planetarias típicas
-orbital_radii = [0.39, 0.72, 1.00, 1.52, 5.20, 9.58, 19.2, 30.1]
-for r in orbital_radii:
-    circle = plt.Circle((0, 0), r, color='gray', linestyle='--', linewidth=0.5, fill=False)
-    plt.gca().add_patch(circle)
+# Guardar posiciones en cada paso
+positions = np.zeros((n_steps, sim.N, 2))  # solo plano XY
 
-# Dibujar vector de velocidad en el punto de impacto
-impact_x, impact_y = asteroid_xy[0]  # posición de impacto (primer punto)
-vx, vy = launch_velocity[:2]         # componentes x, y de la velocidad
+for i in range(n_steps):
+    sim.integrate(sim.t + dt)
+    for j, p in enumerate(sim.particles):
+        positions[i, j, 0] = p.x
+        positions[i, j, 1] = p.y
 
-scale = 5  # ajusta para que la flecha se vea clara
-plt.quiver(
-    impact_x, impact_y, vx, vy,
-    angles='xy', scale_units='xy', scale=1/scale,
-    color='green', label='Vector de lanzamiento'
-)
+# Preparar animación con matplotlib
+# Nombres reales de los cuerpos (incluye satélite como último)
+planet_names = ["Sun", "Mercury", "Venus", "Earth", "Mars",
+                "Jupiter", "Saturn", "Uranus", "Neptune", "Satellite"]
+
+# Preparar animación con matplotlib
+fig, ax = plt.subplots(figsize=(8, 8))
+colors = ['yellow', 'gray', 'orange', 'blue', 'red', 'brown', 'gold', 'cyan', 'blueviolet', 'black']
+
+# Crear líneas y puntos
+lines = [ax.plot([], [], color=colors[i], lw=1)[0] for i in range(len(planet_names))]
+points = [ax.plot([], [], 'o', color=colors[i], label=planet_names[i])[0] for i in range(len(planet_names))]
+
+# Ajustes visuales
+ax.set_xlim(-35, 35)
+ax.set_ylim(-35, 35)
+ax.set_aspect('equal')
+ax.set_title(f"Propagación hacia atrás desde {end_year}")
+ax.legend(loc='upper right')
+
+# Texto del año en la parte superior
+year_text = ax.text(0.5, 1.02, '', transform=ax.transAxes,
+                    ha='center', va='bottom', fontsize=14, fontweight='bold')
+
+# Función de actualización corregida
+def update(frame):
+    for i in range(sim.N):
+        x = positions[:frame, i, 0]
+        y = positions[:frame, i, 1]
+        lines[i].set_data(x, y)
+        points[i].set_data([positions[frame-1, i, 0]], [positions[frame-1, i, 1]])
+
+    # Calcular el año actual
+    current_fraction = frame / n_steps
+    current_year = end_year - current_fraction * years_back
+    year_text.set_text(f"Año: {current_year:.1f}")
+
+    return lines + points + [year_text]
+
+# Crear y mostrar animación
+ani = FuncAnimation(fig, update, frames=range(10, n_steps, 10), interval=30, blit=False)
 
 plt.show()
