@@ -12,11 +12,12 @@ rebound.horizons.SSL_CONTEXT = "unverified"
 # ------------------------------------------------------------------------------
 # CONFIGURACIÓN GLOBAL
 # ------------------------------------------------------------------------------
-end_year = 2028
+end_year = 2026
 start_year = datetime.now().year
 years_back = end_year - start_year
-n_steps = 10000
+n_steps = 100
 dt = -years_back / n_steps
+Gamma = 50 #Nro de asteroides del dataset
 
 planet_names = ["Sun", "Mercury", "Venus", "Earth", "Mars",
                 "Jupiter", "Saturn", "Uranus", "Neptune", "Satellite"]
@@ -107,21 +108,28 @@ def run_simulation(integrator_name):
     vx = -v_auyr * np.cos(angle)
     vy = -v_auyr * np.sin(angle)
 
-    sim.add(x=earth.x, y=earth.y, z=earth.z,
+    # 🔀 Aplicar desplazamiento SOLO si usamos IAS15
+    x_sat = earth.x + 1e-6 if integrator_name == "ias15" else earth.x
+
+    # Ahora sí, añadir el satélite correctamente
+    sim.add(x=x_sat, y=earth.y, z=earth.z,
             vx=earth.vx + vx, vy=earth.vy + vy, vz=earth.vz,
             m=0.0)
 
     sim.integrator = integrator_name
-    sim.dt = -1e-8 if integrator_name == "ias15" else dt
+    if integrator_name != "ias15":
+        sim.dt = dt
 
     energies, times = [], []
     for _ in range(n_steps):
         sim.integrate(sim.t + dt)
+
+        # Cálculo manual de la energía total
         E_kin = sum(0.5 * p.m * (p.vx**2 + p.vy**2 + p.vz**2) for p in sim.particles if p.m > 0)
         E_pot = 0.0
         for i, pi in enumerate(sim.particles):
             for pj in sim.particles[i+1:]:
-                 if pi.m > 0 and pj.m > 0:
+                if pi.m > 0 and pj.m > 0:
                     dx, dy, dz = pi.x - pj.x, pi.y - pj.y, pi.z - pj.z
                     r = np.sqrt(dx**2 + dy**2 + dz**2)
                     E_pot -= pi.m * pj.m / r
@@ -129,6 +137,7 @@ def run_simulation(integrator_name):
         times.append(sim.t)
 
     return np.array(times), np.array(energies)
+
 
 times_whfast, energies_whfast = run_simulation("whfast")
 times_ias15, energies_ias15 = run_simulation("ias15")
@@ -143,3 +152,52 @@ plt.legend()
 plt.grid(True)
 plt.tight_layout()
 plt.show()
+
+
+results = []
+
+for i in range(GAMMA):
+    # Copiamos la parte esencial de run_simulation para obtener 'sim'
+    sim = rebound.Simulation()
+    sim.units = ('AU', 'yr', 'Msun')
+    sim.add(["Sun", "Mercury", "Venus", "Earth", "Mars",
+             "Jupiter", "Saturn", "Uranus", "Neptune"], date=f"{end_year}-01-01")
+
+    earth = sim.particles[3]
+    v_kms = random.uniform(15, 45)
+    v_auyr = v_kms / 4.74047
+    angle = random.uniform(0, 2 * np.pi)
+    vx = -v_auyr * np.cos(angle)
+    vy = -v_auyr * np.sin(angle)
+
+    sim.add(x=earth.x, y=earth.y, z=earth.z,
+            vx=earth.vx + vx, vy=earth.vy + vy, vz=earth.vz,
+            m=0.0)
+
+    sim.integrator = "whfast"
+    sim.dt = dt
+
+    for _ in range(n_steps):
+        sim.integrate(sim.t + dt)
+
+    asteroid = sim.particles[-1]
+    orbit = rebound.Orbit(asteroid, primary=sim.particles[0])
+
+    results.append({
+        "asteroid_id": i,
+        "integration_years": years_back,
+        "final_x": asteroid.x,
+        "final_y": asteroid.y,
+        "final_z": asteroid.z,
+        "a": orbit.a,
+        "e": orbit.e,
+        "inc": orbit.inc,
+        "Omega": orbit.Omega,
+        "omega": orbit.omega,
+        "f": orbit.f
+    })
+
+# Convertir a DataFrame
+df = pd.DataFrame(results)
+df.to_csv("whfast_asteroid_dataset.csv", index=False)
+print("✅ Dataset guardado como 'whfast_asteroid_dataset.csv'")
