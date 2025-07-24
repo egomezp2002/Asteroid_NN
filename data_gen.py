@@ -168,8 +168,10 @@ def simular_asteroide(idx):
 
     earth = sim.particles[3]
 
-    v_kms = random.uniform(15, 45)
-    v_auyr = v_kms / 4.74047
+    random.seed(idx)
+
+    v_kms = random.uniform(5, 45)
+    v_auyr = v_kms / 4.74047 #cambio unidades
     phi = random.uniform(0, 2 * np.pi)
     theta = random.uniform(0, np.pi)
     vx = v_auyr * np.sin(theta) * np.cos(phi)
@@ -177,7 +179,7 @@ def simular_asteroide(idx):
     vz = v_auyr * np.cos(theta)
 
     sim.add(x=earth.x, y=earth.y, z=earth.z,
-            vx=earth.vx + vx, vy=earth.vy + vy, vz=earth.vz + vz,
+            vx=vx, vy=vy, vz=vz,
             m=0.0)
 
     start_time = time.time()
@@ -185,6 +187,9 @@ def simular_asteroide(idx):
     end_time = time.time()
 
     ast = sim.particles[-1]
+    orbit_ast = sim.particles[-1].orbit(primary=sim.particles[0])
+
+
     print(f"✅ Asteroide {idx} completado")
     return {
         "asteroide": idx,
@@ -194,7 +199,14 @@ def simular_asteroide(idx):
         "vx_final": ast.vx,
         "vy_final": ast.vy,
         "vz_final": ast.vz,
-        "tiempo_s": round(end_time - start_time, 4)
+        "tiempo_s": round(end_time - start_time, 4),
+        "a": orbit_ast.a,                 # Semieje mayor
+        "e": orbit_ast.e,                 # Excentricidad
+        "i": orbit_ast.inc,               # Inclinación
+        "Omega": orbit_ast.Omega,         # Longitud del nodo ascendente
+        "omega": orbit_ast.omega,         # Argumento del periastro
+        "n": orbit_ast.n,                 # Movimiento medio
+        "h": orbit_ast.h,                 # Momento angular específico
     }
 
 # --------------------------------------------------------------------------
