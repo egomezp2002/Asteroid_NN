@@ -17,7 +17,7 @@ import pandas as pd
 csv_name = "asteroides_colisiones_y_no_colisiones.csv"  # Ajusta según tu caso
 df = pd.read_csv(csv_name)
 
-cols_deseadas = ['a', 'e', 'i', 'Omega', 'omega', 'nu', 'mean_speed', 'h', 'año_epoca', 'label']
+cols_deseadas = ['a', 'e', 'i', 'Omega', 'omega', 'n', 'h', 'label']
 df = df[cols_deseadas]
 
 df.to_csv("orbitales_filtrados.csv", index=False)
@@ -27,7 +27,7 @@ print("✅ CSV guardado: orbitales_filtrados.csv")
 df = pd.read_csv("orbitales_filtrados.csv")
 
 # Columnas a normalizar (excluyendo 'label' y 'año_epoca')
-columnas_a_normalizar = ['a', 'e', 'i', 'Omega', 'omega', 'nu', 'mean_speed', 'h']
+columnas_a_normalizar = ['a', 'e', 'i', 'Omega', 'omega', 'n', 'h']
 
 # Crear copia del DataFrame para normalizar
 df_norm = df.copy()
@@ -41,8 +41,7 @@ for col in columnas_a_normalizar:
     else:
         df_norm[col] = 0.0  # valor constante
 
-# No tocar estas dos columnas
-df_norm['año_epoca'] = df['año_epoca']
+# Las columnas que no se editan
 df_norm['label'] = df['label']
 
 # Guardar el nuevo CSV

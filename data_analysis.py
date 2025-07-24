@@ -29,14 +29,14 @@ num_elip = num_samples - num_hiper
 # ----------------------
 # 1. ÓRBITAS ELÍPTICAS
 # ----------------------
-a_elip = np.random.uniform(0.5, 5.2, num_elip)         # a > 0
+a_elip = np.random.uniform(0.5, 15.2, num_elip)         # a > 0
 e_elip = np.random.uniform(0.0, 0.95, num_elip)        # e < 1
 
 # ----------------------
 # 2. ÓRBITAS HIPERBÓLICAS
 # ----------------------
-a_hiper = np.random.uniform(-5.2, -0.5, num_hiper)     # a < 0
-e_hiper = np.random.uniform(1.01, 40.0, num_hiper)      # e > 1
+a_hiper = np.random.uniform(-15.2, -0.5, num_hiper)     # a < 0
+e_hiper = np.random.uniform(1.01, 600.0, num_hiper)      # e > 1
 
 # ----------------------
 # 3. Resto de parámetros comunes
@@ -44,7 +44,6 @@ e_hiper = np.random.uniform(1.01, 40.0, num_hiper)      # e > 1
 i_vals = np.random.uniform(0, 40, num_samples)
 Omega_vals = np.random.uniform(0, 360, num_samples)
 omega_vals = np.random.uniform(0, 360, num_samples)
-nu_vals = np.random.uniform(-120, 120, num_samples)
 
 # ----------------------
 # 4. Combinar todos
@@ -58,14 +57,14 @@ e_vals = np.concatenate([e_elip, e_hiper])
 synthetic_rows = []
 errores = 0
 
-for a, e, i, O, w, nu in zip(a_vals, e_vals, i_vals, Omega_vals, omega_vals, nu_vals):
+for a, e, i, O, w in zip(a_vals, e_vals, i_vals, Omega_vals, omega_vals):
     try:
         # Validar consistencia física antes de guardar
         if (a > 0 and e >= 1) or (a < 0 and e <= 1):
             raise ValueError("Órbita físicamente inconsistente")
 
         # mean_speed solo tiene sentido si la órbita es cerrada
-        mean_speed = np.sqrt(1.0 / a**3) if a > 0 else np.nan
+        n = np.sqrt(1.0 / a**3) if a > 0 else np.nan
 
         # Momento angular específico (solo si órbita es cerrada)
         h = np.sqrt(a * (1 - e**2)) if (a > 0 and e < 1) else np.nan
@@ -76,11 +75,9 @@ for a, e, i, O, w, nu in zip(a_vals, e_vals, i_vals, Omega_vals, omega_vals, nu_
             'i': i,
             'Omega': O,
             'omega': w,
-            'nu': nu,
-            'mean_speed': mean_speed,
+            'n': n,
             'h': h,
             'label': 0,
-            'año_epoca': datetime.now().year
         })
     except ValueError:
         errores += 1

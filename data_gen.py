@@ -220,6 +220,7 @@ if __name__ == "__main__":
         resultados = pool.map(simular_asteroide, range(num_asteroides))
 
     df = pd.DataFrame(resultados)
+    df["label"] = 1  # Etiqueta añadida
 
     csv_name = f"resultados_{num_asteroides}ast_dt{dt_label}_hasta{end_year}.csv"
     npy_name = f"resultados_{num_asteroides}ast_dt{dt_label}_hasta{end_year}.npy"
