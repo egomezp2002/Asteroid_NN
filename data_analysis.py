@@ -27,7 +27,7 @@ df_no_collision = df.copy()
 columns_to_multiply = df_no_collision.columns.difference(['label'])
 
 # Aplicar el escalamiento aleatorio
-df_no_collision[columns_to_multiply] *= np.random.uniform(0.85, 1.15, size=df_no_collision[columns_to_multiply].shape)
+df_no_collision[columns_to_multiply] *= np.random.uniform(0.10, 1.90, size=df_no_collision[columns_to_multiply].shape)
 
 # Etiquetar como no colisión
 df_no_collision["label"] = 0
@@ -147,3 +147,24 @@ plt.legend()
 plt.grid(True)
 plt.tight_layout()
 plt.show()
+
+parametros = ['i', 'Omega', 'omega']
+colores = {0: 'tab:blue', 1: 'tab:red'}
+
+# Crear una figura para cada parámetro
+for param in parametros:
+    plt.figure(figsize=(10, 5))
+
+    # Histograma de no impactadores
+    plt.hist(df[df['label'] == 0][param], bins=50, alpha=0.6, label='No impacta (0)', color=colores[0], density=True)
+
+    # Histograma de impactadores
+    plt.hist(df[df['label'] == 1][param], bins=50, alpha=0.6, label='Impacta (1)', color=colores[1], density=True)
+
+    plt.title(f"Distribución de '{param}' — Impactadores vs No impactadores")
+    plt.xlabel(param)
+    plt.ylabel("Densidad (normalizada)")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
