@@ -53,27 +53,72 @@ from sklearn.model_selection import train_test_split
 
 # Seleccionar las columnas de entrada y la salida (label)
 # X = df[['a', 'e', 'i', 'Omega', 'omega', 'nu', 'h']].values
-X = df[['a', 'e', 'i', 'Omega', 'omega']].values
-y = df['label'].values
+X = df_norm[['a', 'e', 'i', 'Omega', 'omega']].values
+y = df_norm['label'].values
 
-# Separar en datos de entrenamiento y prueba (80/20)
+# Convertir etiquetas: 1 (KI) → 0.9, 0 (observado) → 0.1
+# Etiquetas suaves: 0.9 para KIs (impactadores probables), 0.1 para objetos observados (muy improbables): es una recomendación del paper
+# y = np.where(y == 1, 0.9, 0.1)
+
+# Separar datos: 90% entrenamiento / 10% prueba
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
 
-# Crear el modelo
+# Crear el modelo HOI
 model = tf.keras.models.Sequential([
-    tf.keras.layers.Dense(16, activation='relu', input_shape=(X.shape[1],)),  # Capa oculta 1
-    tf.keras.layers.Dense(8, activation='relu'),                               # Capa oculta 2
-    tf.keras.layers.Dense(1, activation='sigmoid')                             # Capa de salida (binaria)
+    tf.keras.layers.Input(shape=(5,)),           # Capa de entrada con 5 parámetros
+    tf.keras.layers.Dense(7, activation='relu'), # Capa oculta 1 (7 neuronas)
+    tf.keras.layers.Dense(3, activation='relu'), # Capa oculta 2 (3 neuronas)
+    tf.keras.layers.Dense(1, activation='sigmoid') # Capa de salida binaria
 ])
 
-# Compilar el modelo
+# Compilar el modelo con optimizador Adam y entropía cruzada
 model.compile(optimizer='adam',
               loss='binary_crossentropy',
-              metrics=['accuracy'])
+              metrics=[
+                  tf.keras.metrics.MeanAbsoluteError(name='mae'),
+                  tf.keras.metrics.AUC(name='auc'),
+                  tf.keras.metrics.BinaryAccuracy(name='bin_acc', threshold=0.5)
+              ])
 
-# Entrenar el modelo
-model.fit(X_train, y_train, epochs=500, batch_size=16, validation_split=0.2)
+# Parada temprana si la mejora por época es < 1%
+early_stopping = tf.keras.callbacks.EarlyStopping(
+    monitor='val_loss',
+    patience=10,
+    min_delta=0.01,
+    restore_best_weights=True
+)
+
+# Entrenar el modelo (con validación del 20% de los datos de entrenamiento)
+model.fit(X_train, y_train,
+          epochs=500,
+          batch_size=16,
+          validation_split=0.2,
+          callbacks=[early_stopping],
+          verbose=1)
+
+# Guardar el modelo entrenado
+model.save("modelo_entrenado.keras")
+print("✅ Modelo guardado como modelo_entrenado.keras")
+
+from keras.models import load_model
+
+model = load_model("modelo_entrenado.keras")
 
 # Evaluar en el conjunto de prueba
-loss, accuracy = model.evaluate(X_test, y_test)
-print(f"🔍 Precisión en test: {accuracy:.4f}")
+loss, mae, auc, bin_acc = model.evaluate(X_test, y_test, verbose=0)
+print(f"📊 Test Loss: {loss:.4f} | MAE: {mae:.4f} | AUC: {auc:.4f} | Binary Accuracy: {bin_acc:.4f}")
+
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X)
+
+plt.figure(figsize=(8,6))
+plt.scatter(X_pca[:,0], X_pca[:,1], c=y, cmap="coolwarm", alpha=0.6)
+plt.title("Reducción PCA de datos normalizados")
+plt.xlabel("Componente 1")
+plt.ylabel("Componente 2")
+plt.colorbar(label="Label (0=No colisión, 1=Colisión)")
+plt.show()
+

@@ -15,79 +15,99 @@ import pickle
 import pandas as pd
 
 # Cargar archivo original existente
-csv_name = "resultados_2000ast_dt0_001625_hasta2350.csv"  # Ajusta según tu caso
+csv_name = "resultados_20000ast_dt0_001625_hasta2350.csv"  # Ajusta según tu caso
 df = pd.read_csv(csv_name)
 
+# --------------------------------------------------------------------------------------------#
+# OPCIÓN 1
+
+df_no_collision = df.copy()
+
+# Evitar modificar la columna 'label' si existe
+columns_to_multiply = df_no_collision.columns.difference(['label'])
+
+# Aplicar el escalamiento aleatorio
+df_no_collision[columns_to_multiply] *= np.random.uniform(0.85, 1.15, size=df_no_collision[columns_to_multiply].shape)
+
+# Etiquetar como no colisión
+df_no_collision["label"] = 0
+
+# Asegurar que el original tenga label = 1
+df["label"] = 1
+
+
+
 # -----------------------------------------
-# 🔁 Añadir 2000 asteroides que NO chocan
+# 🔁 Añadir 2000 asteroides que NO chocan - OPCIÓN 2
 # -----------------------------------------
-num_samples = 2000
-frac_hiperbolicos = 0.5
-num_hiper = int(num_samples * frac_hiperbolicos)
-num_elip = num_samples - num_hiper
+# num_samples = 2000
+# frac_hiperbolicos = 0.5
+# num_hiper = int(num_samples * frac_hiperbolicos)
+# num_elip = num_samples - num_hiper
 
-# ----------------------
-# 1. ÓRBITAS ELÍPTICAS
-# ----------------------
-a_elip = np.random.uniform(0.5, 15.2, num_elip)         # a > 0
-e_elip = np.random.uniform(0.0, 0.95, num_elip)        # e < 1
+# # ----------------------
+# # 1. ÓRBITAS ELÍPTICAS
+# # ----------------------
+# a_elip = np.random.uniform(0.5, 15.2, num_elip)         # a > 0
+# e_elip = np.random.uniform(0.0, 0.95, num_elip)        # e < 1
 
-# ----------------------
-# 2. ÓRBITAS HIPERBÓLICAS
-# ----------------------
-a_hiper = np.random.uniform(-15.2, -0.5, num_hiper)     # a < 0
-e_hiper = np.random.uniform(1.01, 600.0, num_hiper)      # e > 1
+# # ----------------------
+# # 2. ÓRBITAS HIPERBÓLICAS
+# # ----------------------
+# a_hiper = np.random.uniform(-15.2, -0.5, num_hiper)     # a < 0
+# e_hiper = np.random.uniform(1.01, 2.0, num_hiper)      # e > 1
 
-# ----------------------
-# 3. Resto de parámetros comunes
-# ----------------------
-i_vals = np.random.uniform(0, 40, num_samples)
-Omega_vals = np.random.uniform(0, 360, num_samples)
-omega_vals = np.random.uniform(0, 360, num_samples)
+# # ----------------------
+# # 3. Resto de parámetros comunes
+# # ----------------------
+# i_vals = np.random.uniform(0, 40, num_samples)
+# Omega_vals = np.random.uniform(0, 360, num_samples)
+# omega_vals = np.random.uniform(0, 360, num_samples)
 
-# ----------------------
-# 4. Combinar todos
-# ----------------------
-a_vals = np.concatenate([a_elip, a_hiper])
-e_vals = np.concatenate([e_elip, e_hiper])
+# # ----------------------
+# # 4. Combinar todos
+# # ----------------------
+# a_vals = np.concatenate([a_elip, a_hiper])
+# e_vals = np.concatenate([e_elip, e_hiper])
 
-# ----------------------
-# 5. Construcción del DataFrame
-# ----------------------
-synthetic_rows = []
-errores = 0
+# # ----------------------
+# # 5. Construcción del DataFrame
+# # ----------------------
+# synthetic_rows = []
+# errores = 0
 
-for a, e, i, O, w in zip(a_vals, e_vals, i_vals, Omega_vals, omega_vals):
-    try:
-        # Validar consistencia física antes de guardar
-        if (a > 0 and e >= 1) or (a < 0 and e <= 1):
-            raise ValueError("Órbita físicamente inconsistente")
+# for a, e, i, O, w in zip(a_vals, e_vals, i_vals, Omega_vals, omega_vals):
+#     try:
+#         # Validar consistencia física antes de guardar
+#         if (a > 0 and e >= 1) or (a < 0 and e <= 1):
+#             raise ValueError("Órbita físicamente inconsistente")
 
-        # mean_speed solo tiene sentido si la órbita es cerrada
-        n = np.sqrt(1.0 / a**3) if a > 0 else np.nan
+#         # mean_speed solo tiene sentido si la órbita es cerrada
+#         n = np.sqrt(1.0 / a**3) if a > 0 else np.nan
 
-        # Momento angular específico (solo si órbita es cerrada)
-        h = np.sqrt(a * (1 - e**2)) if (a > 0 and e < 1) else np.nan
+#         # Momento angular específico (solo si órbita es cerrada)
+#         h = np.sqrt(a * (1 - e**2)) if (a > 0 and e < 1) else np.nan
 
-        synthetic_rows.append({
-            'a': a,
-            'e': e,
-            'i': i,
-            'Omega': O,
-            'omega': w,
-            'n': n,
-            'h': h,
-            'label': 0,
-        })
-    except ValueError:
-        errores += 1
-        continue
+#         synthetic_rows.append({
+#             'a': a,
+#             'e': e,
+#             'i': i,
+#             'Omega': O,
+#             'omega': w,
+#             'n': n,
+#             'h': h,
+#             'label': 0,
+#         })
+#     except ValueError:
+#         errores += 1
+#         continue
 
-print(f"✅ Generados {len(synthetic_rows)} asteroides sintéticos válidos (descartados: {errores})")
+# print(f"✅ Generados {len(synthetic_rows)} asteroides sintéticos válidos (descartados: {errores})")
 
+# # Crear DataFrame con asteroides que no colisionan
+# df_no_collision = pd.DataFrame(synthetic_rows)
 
-# Crear DataFrame con asteroides que no colisionan
-df_no_collision = pd.DataFrame(synthetic_rows)
+#--------------------------------------------------------------------------------------------#
 
 # Combinar con el original (suponiendo que se llama df y ya tiene 'label' = 1 para los que chocan)
 df_combined = pd.concat([df, df_no_collision], ignore_index=True)

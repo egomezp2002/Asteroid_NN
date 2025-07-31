@@ -24,7 +24,7 @@ start_year = datetime.now().year
 years_back = end_year - start_year
 n_steps = 200000
 dt = -years_back / n_steps
-num_asteroides = 2000
+num_asteroides = 20000
 dt_label = f"{abs(dt):.6f}".replace('.', '_')
 integrator_name = 'whfast'
 
