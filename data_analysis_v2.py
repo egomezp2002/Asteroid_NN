@@ -1,5 +1,6 @@
 
 
+
 import numpy as np
 from datetime import datetime
 import matplotlib.pyplot as plt
@@ -157,22 +158,46 @@ plt.grid(True)
 plt.tight_layout()
 plt.show()
 
-parametros = ['i', 'Omega', 'omega']
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+
+parametros = ['i', 'n', 'h']
 colores = {0: 'tab:blue', 1: 'tab:red'}
 
-# Crear una figura para cada parámetro
 for param in parametros:
     plt.figure(figsize=(10, 5))
 
-    # Histograma de no impactadores
-    plt.hist(df[df['label'] == 0][param], bins=50, alpha=0.6, label='Non-impactor (0)', color=colores[0], density=True)
+    # Extraer datos y quitar NaNs
+    data0 = df[df['label'] == 0][param].dropna()
+    data1 = df[df['label'] == 1][param].dropna()
 
-    # Histograma de impactadores
-    plt.hist(df[df['label'] == 1][param], bins=50, alpha=0.6, label='Impactor (1)', color=colores[1], density=True)
+    # Filtrar percentiles solo si el parámetro es 'n' o 'h'
+    if param in ['n', 'h']:
+        p10 = np.percentile(pd.concat([data0, data1]), 10)
+        p90 = np.percentile(pd.concat([data0, data1]), 98)
+        data0 = data0[(data0 >= p10) & (data0 <= p90)]
+        data1 = data1[(data1 >= p10) & (data1 <= p90)]
+    # Para todos los casos: definir el rango para KDE y ejes
+    min_val = min(data0.min(), data1.min())
+    max_val = max(data0.max(), data1.max())
+    x_vals = np.linspace(min_val, max_val, 500)
 
-    plt.title(f"Distribution of'{param}' — Impactors and non impactors")
-    plt.xlabel(param +'(rads)')
-    plt.ylabel("Density of data")
+    # Histograma
+    plt.hist(data0, bins=50, alpha=0.4, color=colores[0], label='Non-impactor (0)', density=True)
+    plt.hist(data1, bins=50, alpha=0.4, color=colores[1], label='Impactor (1)', density=True)
+
+    # KDE
+    if len(data0) > 1:
+        kde0 = gaussian_kde(data0)
+        plt.plot(x_vals, kde0(x_vals), color=colores[0], lw=2)
+    if len(data1) > 1:
+        kde1 = gaussian_kde(data1)
+        plt.plot(x_vals, kde1(x_vals), color=colores[1], lw=2)
+
+    plt.title(f"Distribution of '{param}' — Impactors and non-impactors (80% central)" if param in ['n', 'h'] else f"Distribution of '{param}'")
+    plt.xlabel(param)
+    plt.ylabel("Density")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
