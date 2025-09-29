@@ -29,11 +29,31 @@ print(f"📊 Test Loss: {loss:.4f} | MAE: {mae:.4f} | ACCURACY: {auc:.4f} | Bina
 pca = PCA(n_components=2)
 X_pca = pca.fit_transform(X)
 
-plt.figure(figsize=(8, 6))
-scatter = plt.scatter(X_pca[:, 0], X_pca[:, 1], c=y, cmap="coolwarm", alpha=0.6)
-plt.title("PCA Reduction: Normalised Data")
-plt.xlabel("Comp 1")
-plt.ylabel("Comp 2")
-plt.colorbar(scatter, label="Label (0 = Non-impactor, 1 = Impactor)")
+# Plot mejorado
+plt.figure(figsize=(10, 8))
+scatter = plt.scatter(
+    X_pca[:, 0],
+    X_pca[:, 1],
+    c=y,
+    cmap="coolwarm",
+    alpha=0.7,
+    edgecolor='k',
+    s=60
+)
+
+# Títulos y etiquetas grandes y en negrita
+plt.title("PCA Reduction: Normalised Data", fontsize=20, fontweight='bold')
+plt.xlabel("Principal Component 1", fontsize=16, fontweight='bold')
+plt.ylabel("Principal Component 2", fontsize=16, fontweight='bold')
+
+# Colorbar mejorado
+cbar = plt.colorbar(scatter)
+cbar.set_label("Label (0 = Non-impactor, 1 = Impactor)", fontsize=14, fontweight='bold')
+cbar.ax.tick_params(labelsize=12)
+
+# Ejes más claros
+plt.tick_params(axis='both', labelsize=14)
+plt.grid(True, linestyle='--', alpha=0.6)
+
 plt.tight_layout()
 plt.show()

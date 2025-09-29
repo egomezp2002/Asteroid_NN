@@ -49,75 +49,83 @@ print(f"✅ Datos guardados en: {filename_base}.npy y .csv")
 # ------------------------------------------------------------------------------
 # ANIMACIÓN DE LA TRAYECTORIA HACIA ATRÁS (Sólo para un satélite)
 # ------------------------------------------------------------------------------
-# start_time = time.time()  # 🕒 Inicio de temporizador
+start_time = time.time()  # 🕒 Inicio de temporizador
 
 
-# sim = rebound.Simulation()
-# sim.units = ('AU', 'yr', 'Msun')
-# sim.add(["Sun", "Mercury", "Venus", "Earth", "Mars",
-#          "Jupiter", "Saturn", "Uranus", "Neptune"], date=f"{end_year}-01-01")
+sim = rebound.Simulation()
+sim.units = ('AU', 'yr', 'Msun')
+sim.add(["Sun", "Mercury", "Venus", "Earth", "Mars",
+         "Jupiter", "Saturn", "Uranus", "Neptune"], date=f"{end_year}-01-01")
 
-# earth = sim.particles[3]
-# v_kms = random.uniform(15, 45)
-# v_auyr = v_kms / 4.74047
-# angle = random.uniform(0, 2*np.pi)
-# vx = -v_auyr * np.cos(angle)
-# vy = -v_auyr * np.sin(angle)
+earth = sim.particles[3]
+v_kms = random.uniform(15, 45)
+v_auyr = v_kms / 4.74047
+angle = random.uniform(0, 2*np.pi)
+vx = -v_auyr * np.cos(angle)
+vy = -v_auyr * np.sin(angle)
 
-# sim.add(x=earth.x, y=earth.y, z=earth.z,
-#         vx=earth.vx + vx, vy=earth.vy + vy, vz=earth.vz,
-#         m=0.0)
+sim.add(x=earth.x, y=earth.y, z=earth.z,
+        vx=earth.vx + vx, vy=earth.vy + vy, vz=earth.vz,
+        m=0.0)
 
-# sim.integrator = "whfast"
-# sim.dt = dt
+sim.integrator = "whfast"
+sim.dt = dt
 
-# positions = np.zeros((n_steps, sim.N, 2))  # solo plano XY
+positions = np.zeros((n_steps, sim.N, 2))  # solo plano XY
 
-# for i in range(n_steps):
-#     sim.integrate(sim.t + dt)
-#     for j, p in enumerate(sim.particles):
-#         positions[i, j, 0] = p.x
-#         positions[i, j, 1] = p.y
+for i in range(n_steps):
+    sim.integrate(sim.t + dt)
+    for j, p in enumerate(sim.particles):
+        positions[i, j, 0] = p.x
+        positions[i, j, 1] = p.y
 
-# end_time = time.time()  # 🕒 Fin de temporizador
-# elapsed = end_time - start_time
-# print(f"🕒 Tiempo de propagación: {elapsed:.2f} segundos")
+end_time = time.time()  # 🕒 Fin de temporizador
+elapsed = end_time - start_time
+print(f"🕒 Tiempo de propagación: {elapsed:.2f} segundos")
 
-# fig, ax = plt.subplots(figsize=(8, 8))
-# colors = ['yellow', 'gray', 'orange', 'blue', 'red', 'brown', 'gold', 'cyan', 'blueviolet', 'black']
-# lines = [ax.plot([], [], color=colors[i], lw=1)[0] for i in range(len(planet_names))]
-# points = [ax.plot([], [], 'o', color=colors[i], label=planet_names[i])[0] for i in range(len(planet_names))]
+fig, ax = plt.subplots(figsize=(8, 8))
+colors = ['yellow', 'gray', 'orange', 'blue', 'red', 'brown', 'gold', 'cyan', 'blueviolet', 'black']
+lines = [ax.plot([], [], color=colors[i], lw=1)[0] for i in range(len(planet_names))]
+points = [ax.plot([], [], 'o', color=colors[i], label=planet_names[i])[0] for i in range(len(planet_names))]
 
-# ax.set_xlim(-35, 35)
-# ax.set_ylim(-35, 35)
-# ax.set_xlabel("Distance (AU)")        # Unidad en eje X
-# ax.set_ylabel("Distance (AU)")       # Unidad en eje Y
-# ax.set_aspect('equal')
-# ax.legend(loc='upper right')
-# year_text = ax.text(0.5, 1.02, '', transform=ax.transAxes,
-#                     ha='center', va='bottom', fontsize=14, fontweight='bold')
+# Límites y estilo de los ejes
+ax.set_xlim(-35, 35)
+ax.set_ylim(-35, 35)
+ax.set_xlabel("Distance (AU)", fontsize=16, fontweight='bold')   # Eje X más grande
+ax.set_ylabel("Distance (AU)", fontsize=16, fontweight='bold')   # Eje Y más grande
+ax.tick_params(axis='both', which='major', labelsize=12)         # Tamaño de los ticks
+ax.set_aspect('equal')
 
-# def update(frame):
-#     for i in range(sim.N):
-#         x = positions[:frame, i, 0]
-#         y = positions[:frame, i, 1]
-#         lines[i].set_data(x, y)
-#         points[i].set_data([positions[frame-1, i, 0]], [positions[frame-1, i, 1]])
-#     current_fraction = frame / n_steps
-#     current_year = end_year - current_fraction * years_back
-#     year_text.set_text(f"Year: {current_year:.1f}")
-#     return lines + points + [year_text]
+# Leyenda más grande
+ax.legend(loc='upper right', fontsize=12, title="Planets", title_fontsize=14)
 
-# ani = FuncAnimation(fig, update, frames=range(10, n_steps, 10), interval=30, blit=False)
+# Texto del año más grande
+year_text = ax.text(0.5, 1.02, '', transform=ax.transAxes,
+                    ha='center', va='bottom', fontsize=18, fontweight='bold')
 
-# # Guardar como archivo .mp4
-# # Ruta directa al ejecutable ffmpeg.exe
+def update(frame):
+    for i in range(sim.N):
+        x = positions[:frame, i, 0]
+        y = positions[:frame, i, 1]
+        lines[i].set_data(x, y)
+        points[i].set_data([positions[frame-1, i, 0]], [positions[frame-1, i, 1]])
+    current_fraction = frame / n_steps
+    current_year = end_year - current_fraction * years_back
+    year_text.set_text(f"Year: {current_year:.1f}")
+    return lines + points + [year_text]
 
-# #plt.rcParams['animation.ffmpeg_path'] = r"C:\Users\tooor\Downloads\ffmpeg-7.1.1-essentials_build\ffmpeg-7.1.1-essentials_build\bin\ffmpeg.exe"
-# #writer = FFMpegWriter(fps=30, metadata=dict(artist='Tu Nombre'), bitrate=1800)
-# #ani.save("trayectoria_hacia_atras.mp4", writer=writer)
+ani = FuncAnimation(fig, update, frames=range(10, n_steps, 10), interval=30, blit=False)
 
-# plt.show()
+plt.show()
+breakpoint()
+
+# Guardar como archivo .mp4
+# Ruta directa al ejecutable ffmpeg.exe
+
+#plt.rcParams['animation.ffmpeg_path'] = r"C:\Users\tooor\Downloads\ffmpeg-7.1.1-essentials_build\ffmpeg-7.1.1-essentials_build\bin\ffmpeg.exe"
+#writer = FFMpegWriter(fps=30, metadata=dict(artist='Tu Nombre'), bitrate=1800)
+#ani.save("trayectoria_hacia_atras.mp4", writer=writer)
+
 
 # ------------------------------------------------------------------------------
 # Generación del database paralelizando
