@@ -35,7 +35,7 @@ try:
 except Exception:
     df = pd.DataFrame(np.load("resultados_20000ast_dt0_001625_hasta2350.npy", allow_pickle=True))
 
-muestra = df.iloc[274]   # fila a usar
+muestra = df.iloc[388]   # fila a usar
 
 # (opcional) extraer elementos orbitales si existen en el DF
 try:
@@ -184,37 +184,27 @@ def montecarlo_paralelo(n_iter=1000, sigma_pos=1e-3, sigma_vel=1e-5,
 # ------------------------------------------------------------
 def cartesian_to_orbital(sim, x, y, z, vx, vy, vz):
     """
-    Convierte (x,y,z,vx,vy,vz) a elementos heliocéntricos (a, e, inc, Ω, ω).
-    Funciona con versiones de REBOUND que NO tienen Particle.calculate_orbit.
+    Convierte (x,y,z,vx,vy,vz) a elementos heliocéntricos (a, e, inc, Ω, ω)
+    usando la API antigua: ast.orbit(primary=sun).
+    - No mueve el tiempo de la simulación.
+    - Añade y elimina temporalmente una partícula test.
     """
-    # Partícula “suelta”
-    p = rebound.Particle(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, m=0)
-    sun = sim.particles[0]  # Sol como primario
-
-    # Intento 1: API nueva (si existiera en tu versión, no dará AttributeError)
+    sun = sim.particles[0]           # Sol
+    idx_new = len(sim.particles)     # índice donde quedará el asteroide temporal
+    sim.add(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, m=0)
     try:
-        # en algunas versiones: p.calculate_orbit(primary=sun, G=sim.G) — G no suele hacer falta
-        orb = p.calculate_orbit(primary=sun)
-        return orb.a, orb.e, orb.inc, orb.Omega, orb.omega
-    except AttributeError:
-        pass  # caemos al fallback
-
-    # Fallback: añadir temporalmente la partícula al sim y usar sim.calculate_orbits()
-    idx_new = len(sim.particles)
-    sim.add(p)
-    try:
-        orbits = sim.calculate_orbits(primary=sun)
-        orb = orbits[-1]  # la última es la recién añadida
+        ast = sim.particles[-1]
+        orb = ast.orbit(primary=sun)  # <-- API compatible con tu versión
         return orb.a, orb.e, orb.inc, orb.Omega, orb.omega
     finally:
-        # Limpieza: quitar la partícula temporal
+        # Quita siempre la partícula temporal, incluso si hay error arriba
         sim.remove(index=idx_new)
 
 
 def batch_cartesian_to_orbital(sim, pos, vel):
     """
-    Vectoriza la conversión para arrays (N,3) de posiciones y velocidades.
-    Devuelve array (N,5): [a, e, inc, Ω, ω]
+    Convierte arrays (N,3) de posiciones y velocidades a (N,5) elementos:
+    [a, e, inc, Ω, ω], con órbitas heliocéntricas.
     """
     N = pos.shape[0]
     out = np.empty((N, 5), dtype=float)
@@ -222,7 +212,7 @@ def batch_cartesian_to_orbital(sim, pos, vel):
         a, e, inc, Om, om = cartesian_to_orbital(
             sim,
             pos[i, 0], pos[i, 1], pos[i, 2],
-            vel[i, 0], vel[i, 1], vel[i, 2],
+            vel[i, 0], vel[i, 1], vel[i, 2]
         )
         out[i] = (a, e, inc, Om, om)
     return out
