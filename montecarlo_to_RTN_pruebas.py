@@ -1,5 +1,3 @@
-
-
 import numpy as np
 from datetime import datetime
 import matplotlib.pyplot as plt
@@ -37,7 +35,7 @@ try:
 except:
     df = pd.DataFrame(np.load("resultados_20000ast_dt0_001625_hasta2350.npy", allow_pickle=True))
 
-muestra = df.iloc[222]   # fila número X
+muestra = df.iloc[144]   # fila número X
 
 
 # Montecarlo
@@ -142,10 +140,53 @@ def simular_un_asteroide(args):
     xf, yf, zf = ast.x, ast.y, ast.z
     return impacto, x0, y0, z0, xf, yf, zf
 
+def simulacion_nominal(distancia_check_UA=1e-2, n_checks=118625):
+    """
+    Ejecuta la simulación SIN perturbaciones.
+    Devuelve (impacto, x0, y0, z0, xf, yf, zf)
+    """
 
+    sim = cargar_simulacion_base().copy()
+    sim.integrator = integrator_name
+    sim.dt = dt
+
+    # Condiciones nominales (sin ruido)
+    x, y, z = muestra['x_final'], muestra['y_final'], muestra['z_final']
+    vx, vy, vz = muestra['vx_final'], muestra['vy_final'], muestra['vz_final']
+
+    x0, y0, z0 = x, y, z
+
+    sim.add(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, m=0)
+
+    earth = sim.particles[3]
+    ast   = sim.particles[-1]
+
+    tiempos = np.linspace(start_year, end_year, n_checks)
+    thr2 = distancia_check_UA**2
+    impacto = 0
+
+    for t in tiempos:
+        sim.integrate(t, exact_finish_time=False)
+        dx = earth.x - ast.x
+        dy = earth.y - ast.y
+        dz = earth.z - ast.z
+        if (dx*dx + dy*dy + dz*dz) < thr2:
+            impacto = 1
+            break
+
+    xf, yf, zf = ast.x, ast.y, ast.z
+    vxf, vyf, vzf = ast.vx, ast.vy, ast.vz
+
+    return impacto, x0, y0, z0, xf, yf, zf, vxf, vyf, vzf
 
 def montecarlo_paralelo(n_iter=1000, sigma_pos=1e-3, sigma_vel=1e-5, 
                         distancia_check_UA=1e-2, n_checks=118625):
+
+    # --- Simulación nominal ---
+    nominal = simulacion_nominal(distancia_check_UA, n_checks)
+    impacto_nom, x0_nom, y0_nom, z0_nom, xf_nom, yf_nom, zf_nom, vxf_nom, vyf_nom, vzf_nom = nominal
+
+    # --- Monte Carlo ---
     seeds = np.arange(n_iter, dtype=int)
     args = [(int(seed), sigma_pos, sigma_vel, distancia_check_UA, n_checks) for seed in seeds]
 
@@ -156,143 +197,87 @@ def montecarlo_paralelo(n_iter=1000, sigma_pos=1e-3, sigma_vel=1e-5,
     with Pool(processes=num_procs, initializer=_pool_init, initargs=(sim_bytes,)) as pool:
         resultados = pool.map(simular_un_asteroide, args)
 
-    # Desempaquetar resultados
     impactos = [r[0] for r in resultados]
     pos_ini  = np.array([[r[1], r[2], r[3]] for r in resultados])
     pos_fin  = np.array([[r[4], r[5], r[6]] for r in resultados])
 
     prob = 100.0 * (sum(impactos) / float(n_iter))
-    return prob, pos_ini, pos_fin
 
-
+    return {
+        "probabilidad_mc": prob,
+        "impactos_mc": impactos,
+        "pos_ini_mc": pos_ini,
+        "pos_fin_mc": pos_fin,
+        "impacto_nominal": impacto_nom,
+        "pos_ini_nominal": np.array([x0_nom, y0_nom, z0_nom]),
+        "pos_fin_nominal": np.array([xf_nom, yf_nom, zf_nom]),
+        "vel_nominal": np.array([vxf_nom, vyf_nom, vzf_nom])   # <-- Añadido
+    }
 # --------------------------------------------------------------------------
 # USO
 # --------------------------------------------------------------------------
 if __name__ == "__main__":
     cargar_simulacion_base()
 
-    prob, pos_ini, pos_fin = montecarlo_paralelo(
-        n_iter=1200, 
+    resultados = montecarlo_paralelo(
+        n_iter=3000, 
         sigma_pos=1e-5, 
         sigma_vel=1e-6,
         distancia_check_UA=1e-2,
         n_checks=118625
     )
-    print(f"Probabilidad estimada de impacto: {prob:.2f}%")
 
-    def set_equal_3d_from_points(ax, X, Y, Z, pad_ratio=0.05):
-        xmin, xmax = np.min(X), np.max(X)
-        ymin, ymax = np.min(Y), np.max(Y)
-        zmin, zmax = np.min(Z), np.max(Z)
-        cx = 0.5*(xmin+xmax); cy = 0.5*(ymin+ymax); cz = 0.5*(zmin+zmax)
-        ranges = np.array([xmax-xmin, ymax-ymin, zmax-zmin], dtype=float)
-        R = np.max(ranges)
-        if R == 0: R = 1e-9
-        R *= (1 + pad_ratio)
-        ax.set_xlim(cx - R/2, cx + R/2)
-        ax.set_ylim(cy - R/2, cy + R/2)
-        ax.set_zlim(cz - R/2, cz + R/2)
-        try:
-            ax.set_box_aspect([1,1,1])
-        except Exception:
-            pass
-
-    def bbox_from_points(P, scale=1.05):
-        X, Y, Z = P[:,0], P[:,1], P[:,2]
-        xmin, xmax = X.min(), X.max()
-        ymin, ymax = Y.min(), Y.max()
-        zmin, zmax = Z.min(), Z.max()
-        cx = 0.5*(xmin+xmax); cy = 0.5*(ymin+ymax); cz = 0.5*(zmin+zmax)
-        R = max(xmax-xmin, ymax-ymin, zmax-zmin)
-        if R == 0: R = 1e-9
-        return (cx, cy, cz), 0.5*R*scale
-
-    # --- Figura con dos paneles: global y zoom a iniciales ---
-    fig = plt.figure(figsize=(12, 6))
-    ax_global = fig.add_subplot(1, 2, 1, projection='3d')
-    ax_zoom   = fig.add_subplot(1, 2, 2, projection='3d')
-
-# Global (ambos conjuntos)
-    ax_global.scatter(pos_ini[:,0], pos_ini[:,1], pos_ini[:,2],
-              s=28, facecolors='none', edgecolors='blue',
-              linewidths=0.9, label='Initial points', zorder=3)
-    ax_global.scatter(pos_fin[:,0], pos_fin[:,1], pos_fin[:,2],
-              s=12, c='red', alpha=0.7, label='Final points', zorder=2)
-
-    X_all = np.concatenate([pos_ini[:,0], pos_fin[:,0]])
-    Y_all = np.concatenate([pos_ini[:,1], pos_fin[:,1]])
-    Z_all = np.concatenate([pos_ini[:,2], pos_fin[:,2]])
-    set_equal_3d_from_points(ax_global, X_all, Y_all, Z_all, pad_ratio=0.05)
-
-    ax_global.set_title("Final positions", fontsize=16, fontweight='bold')
-    ax_global.set_xlabel("X [AU]", fontsize=16, fontweight='bold')
-    ax_global.set_ylabel("Y [AU]", fontsize=16, fontweight='bold')
-    ax_global.set_zlabel("Z [AU]", fontsize=16, fontweight='bold')
-    ax_global.legend(loc='upper left')
-
-# Zoom (solo iniciales)
-    ax_zoom.scatter(pos_ini[:,0], pos_ini[:,1], pos_ini[:,2],
-            s=40, facecolors='none', edgecolors='blue',
-            linewidths=1.2, label='Iniciales', zorder=3)
-
-    (cx, cy, cz), R = bbox_from_points(pos_ini, scale=1.10)
-    ax_zoom.set_xlim(cx - R, cx + R)
-    ax_zoom.set_ylim(cy - R, cy + R)
-    ax_zoom.set_zlim(cz - R, cz + R)
-    try:
-        ax_zoom.set_box_aspect([1,1,1])
-    except Exception:
-        pass
-
-    ax_zoom.set_title("Initial positions", fontsize=16, fontweight='bold')
-    ax_zoom.set_xlabel("X [AU]", fontsize=16, fontweight='bold')
-    ax_zoom.set_ylabel("Y [AU]", fontsize=16, fontweight='bold')
-    ax_zoom.set_zlabel("Z [AU]", fontsize=16, fontweight='bold')
-    ax_zoom.legend(loc='upper left')
-
-    plt.suptitle("Monte Carlo: initial positions (blue) and final positions (red)",
-             fontsize=20, fontweight='bold')
-    plt.tight_layout()
-    plt.show()
-
-# --- Transformación a Coordenadas RTN ---
-    import matplotlib.patches as patches
-
-# 1. Estado nominal
-# --- Datos nominales y transformación a RTN ---
-    r_nominal = np.mean(pos_fin, axis=0)
-    v_nominal = np.array([muestra['vx_final'], muestra['vy_final'], muestra['vz_final']])
-
+    print(f"Probabilidad estimada de impacto (MC): {resultados['probabilidad_mc']:.2f}%")
     def get_rotation_matrix_C(r, v):
+        """
+        Devuelve la matriz de transformación de ECI -> RTN.
+        r: vector posición nominal [x, y, z]
+        v: vector velocidad nominal [vx, vy, vz]
+        """
         r_unit = r / np.linalg.norm(r)
         h = np.cross(r, v)
         h_unit = h / np.linalg.norm(h)
         t_unit = np.cross(h_unit, r_unit)
         return np.column_stack((r_unit, t_unit, h_unit))
+    
+    # Nominal: posición y velocidad final
+    r_nominal = resultados["pos_fin_nominal"]
+    v_nominal = resultados["vel_nominal"]
 
+    # Matriz de transformación
     C = get_rotation_matrix_C(r_nominal, v_nominal)
-    dx = pos_fin - r_nominal
+
+    # Transformar todos los puntos finales Monte Carlo
+    dx = resultados["pos_fin_mc"] - r_nominal  # vector desde nominal
     pos_rtn = (C.T @ dx.T).T
 
-# --- Plotting with Covariance Ellipses ---
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as patches
+
+    # --- Filtrar puntos fuera de 5σ ---
+    sigma = np.std(pos_rtn, axis=0)        # σ por eje (Radial, In-track, Cross-track)
+    mask = np.all(np.abs(pos_rtn) <= 6*sigma, axis=1)
+    pos_rtn_filt = pos_rtn[mask]
+
+    # --- 2D Covariance Ellipses ---
     fig, axs = plt.subplots(1, 3, figsize=(18, 6))
 
-    plot_pairs = [(1, 0), (1, 2), (0, 2)]
+    plot_pairs = [(1, 0), (1, 2), (0, 2)]  # (x, y) = In-track vs Radial, etc
     titles = ['Orbital Plane (In-track vs Radial)',
-          'In-track vs Cross-track',
-          'Radial vs Cross-track']
+            'In-track vs Cross-track',
+            'Radial vs Cross-track']
     x_labels = ['In-track [AU]', 'In-track [AU]', 'Radial [AU]']
     y_labels = ['Radial [AU]', 'Cross-track [AU]', 'Cross-track [AU]']
     colors = ['red', 'green', 'blue']
 
     for i, (idx_x, idx_y) in enumerate(plot_pairs):
-        x = pos_rtn[:, idx_x]
-        y = pos_rtn[:, idx_y]
+        x = pos_rtn_filt[:, idx_x]
+        y = pos_rtn_filt[:, idx_y]
 
-        # --- Scatter de Monte Carlo ---
+        # Scatter Monte Carlo
         axs[i].scatter(x, y, s=10, c=colors[i], alpha=0.4, label='Monte Carlo Samples')
 
-        # --- Covarianza y elipse ---
+        # Covarianza y elipse
         cov = np.cov(x, y)
         vals, vecs = np.linalg.eigh(cov)
         order = vals.argsort()[::-1]
@@ -302,48 +287,39 @@ if __name__ == "__main__":
         for n_sigma, ltype, alpha in zip([1, 3], ['--', '-'], [0.8, 0.3]):
             width, height = 2 * n_sigma * np.sqrt(vals)
             ell = patches.Ellipse(xy=(np.mean(x), np.mean(y)),
-                              width=width, height=height, angle=theta,
-                              edgecolor='black', lw=1.5, facecolor='none',
-                              ls=ltype, alpha=alpha, label=f'{n_sigma}$\\sigma$ Bound')
+                                width=width, height=height, angle=theta,
+                                edgecolor='black', lw=1.5, facecolor='none',
+                                ls=ltype, alpha=alpha, label=f'{n_sigma}$\\sigma$ Bound')
             axs[i].add_patch(ell)
 
-    # --- Etiquetas y títulos ---
-            axs[i].set_title(titles[i], fontsize=16, fontweight='bold')
-            axs[i].set_xlabel(x_labels[i], fontsize=14, fontweight='bold')
-            axs[i].set_ylabel(y_labels[i], fontsize=14, fontweight='bold')
-            axs[i].grid(True, linestyle=':', alpha=0.6)
-
-    # Solo añadir leyenda en el primer subplot
+        axs[i].set_title(titles[i], fontsize=16, fontweight='bold')
+        axs[i].set_xlabel(x_labels[i], fontsize=14, fontweight='bold')
+        axs[i].set_ylabel(y_labels[i], fontsize=14, fontweight='bold')
+        axs[i].grid(True, linestyle=':', alpha=0.6)
         if i == 0:
             axs[i].legend(fontsize=12)
 
     plt.suptitle("Cloud Dispersion in RTN Coordinates with Covariance Ellipses",
-             fontsize=20, fontweight='bold')
+                fontsize=20, fontweight='bold')
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
 
-    # --- 3D RTN Scatter Plot ---
+    # --- 3D Scatter ---
     fig = plt.figure(figsize=(10, 8))
-    # Le decimos a Matplotlib que esta será una gráfica 3D
     ax = fig.add_subplot(111, projection='3d')
 
-    # Según tu código anterior: 0=Radial, 1=In-track, 2=Cross-track
-    r = pos_rtn[:, 0]
-    t = pos_rtn[:, 1]
-    n = pos_rtn[:, 2]
+    r = pos_rtn_filt[:, 0]
+    t = pos_rtn_filt[:, 1]
+    n = pos_rtn_filt[:, 2]
 
-    # Graficamos la nube de puntos
     ax.scatter(r, t, n, s=5, c='purple', alpha=0.4, label='Monte Carlo Samples')
 
-    # Configuramos las etiquetas de los ejes
     ax.set_xlabel('Radial [AU]', fontweight='bold')
     ax.set_ylabel('In-track [AU]', fontweight='bold')
     ax.set_zlabel('Cross-track [AU]', fontweight='bold')
     ax.set_title('3D Cloud Dispersion in RTN Coordinates', fontsize=16, fontweight='bold')
 
-    # --- TRUCO: Igualar la escala de los ejes ---
-    # En 3D, si los ejes no tienen la misma escala, la nube se verá deformada artificialmente.
-    # Esto fuerza a que la "caja" 3D sea un cubo perfecto.
+    # Escala uniforme en 3D
     max_range = np.array([r.max()-r.min(), t.max()-t.min(), n.max()-n.min()]).max() / 2.0
     mid_r = (r.max()+r.min()) * 0.5
     mid_t = (t.max()+t.min()) * 0.5

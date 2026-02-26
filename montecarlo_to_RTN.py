@@ -37,7 +37,7 @@ try:
 except:
     df = pd.DataFrame(np.load("resultados_20000ast_dt0_001625_hasta2350.npy", allow_pickle=True))
 
-muestra = df.iloc[222]   # fila número X
+muestra = df.iloc[182]   # fila número X
 
 
 # Montecarlo

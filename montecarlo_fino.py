@@ -35,7 +35,7 @@ try:
 except Exception:
     df = pd.DataFrame(np.load("resultados_20000ast_dt0_001625_hasta2350.npy", allow_pickle=True))
 
-muestra = df.iloc[388]   # fila a usar
+muestra = df.iloc[283]   # fila a usar
 
 # (opcional) extraer elementos orbitales si existen en el DF
 try:
@@ -276,8 +276,8 @@ if __name__ == "__main__":
     # 1) Monte Carlo
     prob_mc, pos_ini, vel_ini, pos_fin, vel_fin, impactos = montecarlo_paralelo(
         n_iter=500,
-        sigma_pos=1e-3,
-        sigma_vel=1e-5,
+        sigma_pos=1e-5,
+        sigma_vel=1e-6,
         distancia_check_UA=1e-2,
         n_checks=118625
     )
